@@ -1,0 +1,408 @@
+## GitLab Runner Image
+##
+## By default it's using registry.gitlab.com/gitlab-org/gitlab-runner:alpine-v{VERSION}
+## where {VERSION} is taken from Chart.yaml from appVersion field
+##
+## DEPRECATED: Setting `image: registry.gitlab.com/gitlab-org/gitlab-runner:alpine-v11.6.0` is deprecated
+##
+## ref: https://gitlab.com/gitlab-org/gitlab-runner/container_registry/29383?orderBy=NAME&sort=asc&search[]=alpine-v&search[]=
+##
+## Note: If you change the image to the ubuntu release
+##       don't forget to change the securityContext;
+##       these images run on different user IDs.
+##
+image:
+  registry: registry.gitlab.com
+  image: gitlab-org/gitlab-runner
+  # tag: alpine-v11.6.0
+
+imagePullPolicy: IfNotPresent
+
+## Specifying ImagePullSecrets on a Pod
+## Kubernetes supports specifying container image registry keys on a Pod.
+## ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+##
+# imagePullSecrets:
+#   - name: "image-pull-secret"
+
+## Timeout, in seconds, for liveness and readiness probes of a runner pod.
+probeTimeoutSeconds: 1
+
+## How many runner pods to launch.
+##
+## Note: Using more than one replica is not supported with a runnerToken. Use a runnerRegistrationToken
+## to create multiple runner replicas.
+replicas: 1
+
+## How many old ReplicaSets for this Deployment you want to retain
+revisionHistoryLimit: 10
+
+## The GitLab Server URL (with protocol) that want to register the runner against
+## ref: https://docs.gitlab.com/runner/commands/index.html#gitlab-runner-register
+##
+gitlabUrl: http://gitlab.your-domain.com/
+
+## The Registration Token for adding new Runners to the GitLab Server. This must
+## be retrieved from your GitLab Instance.
+## ref: https://docs.gitlab.com/ce/ci/runners/index.html
+## ref: https://docs.gitlab.com/runner/register/
+##
+
+## runner注册token
+runnerRegistrationToken: "Jh9eKF6YMz9QGBnoGgux"
+
+## The Runner Token for adding new Runners to the GitLab Server. This must
+## be retrieved from your GitLab Instance. It is token of already registered runner.
+## ref: (we don't yet have docs for that, but we want to use existing token)
+##
+# runnerToken: ""
+#
+
+## Unregister all runners before termination
+##
+## Updating the runner's chart version or configuration will cause the runner container
+## to be terminated and created again. This may cause your Gitlab instance to reference
+## non-existant runners. Un-registering the runner before termination mitigates this issue.
+## ref: https://docs.gitlab.com/runner/commands/index.html#gitlab-runner-unregister
+##
+
+## 终止之前注销所有跑步者
+unregisterRunners: true
+
+## When stopping the runner, give it time to wait for its jobs to terminate.
+##
+## Updating the runner's chart version or configuration will cause the runner container
+## to be terminated with a graceful stop request. terminationGracePeriodSeconds
+## instructs Kubernetes to wait long enough for the runner pod to terminate gracefully.
+## ref: https://docs.gitlab.com/runner/commands/#signals
+terminationGracePeriodSeconds: 3600
+
+## Set the certsSecretName in order to pass custom certficates for GitLab Runner to use
+## Provide resource name for a Kubernetes Secret Object in the same namespace,
+## this is used to populate the /home/gitlab-runner/.gitlab-runner/certs/ directory
+## ref: https://docs.gitlab.com/runner/configuration/tls-self-signed.html#supported-options-for-self-signed-certificates-targeting-the-gitlab-server
+##
+# certsSecretName:
+
+## Configure the maximum number of concurrent jobs
+## ref: https://docs.gitlab.com/runner/configuration/advanced-configuration.html#the-global-section
+##
+
+## 并行执行最大的任务数
+concurrent: 10
+
+## Defines in seconds how often to check GitLab for a new builds
+## ref: https://docs.gitlab.com/runner/configuration/advanced-configuration.html#the-global-section
+
+## 新作业检查间隔
+checkInterval: 30
+
+## Configure GitLab Runner's logging level. Available values are: debug, info, warn, error, fatal, panic
+## ref: https://docs.gitlab.com/runner/configuration/advanced-configuration.html#the-global-section
+
+## GitlabRunner日志级别 debug, info, warn, error, fatal, panic
+logLevel: info
+
+## Configure GitLab Runner's logging format. Available values are: runner, text, json
+## ref: https://docs.gitlab.com/runner/configuration/advanced-configuration.html#the-global-section
+
+## GitlabRunner日志格式 runner, text, json
+logFormat: json
+
+## For RBAC support:
+rbac:
+  create: true
+
+  ## Define specific rbac permissions.
+  ## DEPRECATED: see .Values.rbac.rules
+  resources: ["pods", "pods/exec", "secrets"]
+  verbs: ["get", "list", "watch", "create", "patch", "delete"]
+
+  ## Define list of rules to be added to the rbac role permissions.
+  ## Each rule supports the keys:
+  ## - apiGroups: default "" (indicates the core API group) if missing or empty.
+  ## - resources: default "*" if missing or empty.
+  ## - verbs: default "*" if missing or empty.
+  ##
+  ## Read more about the recommended rules on the following link
+  ##
+  ## ref: https://docs.gitlab.com/runner/executors/kubernetes.html#configuring-executor-service-account
+  ##
+  rules:
+  - resources: ["configmaps", "pods", "pods/attach", "secrets", "services"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "patch", "delete"]
+
+## Configure integrated Prometheus metrics exporter
+##
+## ref: https://docs.gitlab.com/runner/monitoring/#configuration-of-the-metrics-http-server
+##
+metrics:
+  enabled: false
+
+  ## Define a name for the metrics port
+  ##
+  portName: metrics
+
+  ## Provide a port number for the integrated Prometheus metrics exporter
+  ##
+  port: 9252
+
+## Configuration for the Pods that the runner launches for each new job
+##
+runners:
+  # runner configuration, where the multi line strings is evaluated as
+  # template so you can specify helm values inside of it.
+  #
+  # tpl: https://helm.sh/docs/howto/charts_tips_and_tricks/#using-the-tpl-function
+  # runner configuration: https://docs.gitlab.com/runner/configuration/advanced-configuration.html
+  config: |
+    [[runners]]
+      [runners.kubernetes]
+        namespace = "{{.Release.Namespace}}"
+        image = "ubuntu:22.04"
+
+  ## Which executor should be used
+  ##
+  # executor: kubernetes
+
+  ## Default container image to use for builds when none is specified
+  ##
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  # image: ubuntu:16.04
+
+  ## Specify one or more imagePullSecrets
+  ##
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  ##
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  # imagePullSecrets: []
+
+  ## Specify the image pull policy: never, if-not-present, always. The cluster default will be used if not set.
+  ##
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  # imagePullPolicy: ""
+
+  ## Defines number of concurrent requests for new job from GitLab
+  ## ref: https://docs.gitlab.com/runner/configuration/advanced-configuration.html#the-runners-section
+  ##
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  # requestConcurrency: 1
+
+  ## Specify whether the runner should be locked to a specific project: true, false. Defaults to true.
+  ##
+  # locked: true
+
+  ## Specify the tags associated with the runner. Comma-separated list of tags.
+  ##
+  ## ref: https://docs.gitlab.com/ee/ci/runners/configure_runners.html#use-tags-to-control-which-jobs-a-runner-can-run
+  ##
+  # tags: ""
+
+  ## Specify the name for the runner.
+  ##
+  # name: ""
+
+  ## Specify the maximum timeout (in seconds) that will be set for job when using this Runner
+  ##
+  # maximumTimeout: ""
+
+  ## Specify if jobs without tags should be run.
+  ## If not specified, Runner will default to true if no tags were specified. In other case it will
+  ## default to false.
+  ##
+  ## ref: https://docs.gitlab.com/ee/ci/runners/configure_runners.html#set-a-runner-to-run-untagged-jobs
+  ##
+  # runUntagged: true
+
+  ## Specify whether the runner should only run protected branches.
+  ## Defaults to false.
+  ##
+  ## ref: https://docs.gitlab.com/ee/ci/runners/configure_runners.html#prevent-runners-from-revealing-sensitive-information
+  ##
+  # protected: true
+
+  ## Run all containers with the privileged flag enabled
+  ## This will allow the docker:dind image to run if you need to run Docker
+  ## commands. Please read the docs before turning this on:
+  ## ref: https://docs.gitlab.com/runner/executors/kubernetes.html#using-dockerdind
+  ##
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  # privileged: false
+
+  ## The name of the secret containing runner-token and runner-registration-token
+  # secret: gitlab-runner
+
+  ## Namespace to run Kubernetes jobs in (defaults to the same namespace of this release)
+  ##
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  # namespace:
+
+  ## The amount of time, in seconds, that needs to pass before the runner will
+  ## timeout attempting to connect to the container it has just created.
+  ## ref: https://docs.gitlab.com/runner/executors/kubernetes.html
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  # pollTimeout: 180
+
+  ## Set maximum build log size in kilobytes, by default set to 4096 (4MB)
+  ## ref: https://docs.gitlab.com/runner/configuration/advanced-configuration.html#the-runners-section
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  # outputLimit: 4096
+
+  ## Distributed runners caching
+  ## ref: https://docs.gitlab.com/runner/configuration/autoscale.html#distributed-runners-caching
+  ##
+  ## If you want to use s3 based distributing caching:
+  ## First of all you need to uncomment General settings and S3 settings sections.
+  ##
+  ## Create a secret 's3access' containing 'accesskey' & 'secretkey'
+  ## ref: https://aws.amazon.com/blogs/security/wheres-my-secret-access-key/
+  ##
+  ## $ kubectl create secret generic s3access \
+  ##   --from-literal=accesskey="YourAccessKey" \
+  ##   --from-literal=secretkey="YourSecretKey"
+  ## ref: https://kubernetes.io/docs/concepts/configuration/secret/
+  ##
+  ## If you want to use gcs based distributing caching:
+  ## First of all you need to uncomment General settings and GCS settings sections.
+  ##
+  ## Access using credentials file:
+  ## Create a secret 'google-application-credentials' containing your application credentials file.
+  ## ref: https://docs.gitlab.com/runner/configuration/advanced-configuration.html#the-runnerscachegcs-section
+  ## You could configure
+  ## $ kubectl create secret generic google-application-credentials \
+  ##   --from-file=gcs-application-credentials-file=./path-to-your-google-application-credentials-file.json
+  ## ref: https://kubernetes.io/docs/concepts/configuration/secret/
+  ##
+  ## Access using access-id and private-key:
+  ## Create a secret 'gcsaccess' containing 'gcs-access-id' & 'gcs-private-key'.
+  ## ref: https://docs.gitlab.com/runner/configuration/advanced-configuration.html#the-runnerscachegcs-section
+  ## You could configure
+  ## $ kubectl create secret generic gcsaccess \
+  ##   --from-literal=gcs-access-id="YourAccessID" \
+  ##   --from-literal=gcs-private-key="YourPrivateKey"
+  ## ref: https://kubernetes.io/docs/concepts/configuration/secret/
+  ##
+  ## If you want to use Azure-based distributed caching:
+  ## First, uncomment General settings.
+  ##
+  ## Create a secret 'azureaccess' containing 'azure-account-name' & 'azure-account-key'
+  ## ref: https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction
+  ##
+  ## $ kubectl create secret generic azureaccess \
+  ##   --from-literal=azure-account-name="YourAccountName" \
+  ##   --from-literal=azure-account-key="YourAccountKey"
+  ## ref: https://kubernetes.io/docs/concepts/configuration/secret/
+
+  cache: {}
+    ## General settings
+    ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration and https://docs.gitlab.com/runner/install/kubernetes.html#using-cache-with-configuration-template
+    # cacheType: s3
+    # cachePath: "gitlab_runner"
+    # cacheShared: true
+
+    ## S3 settings
+    ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration and https://docs.gitlab.com/runner/install/kubernetes.html#using-cache-with-configuration-template
+    # s3ServerAddress: s3.amazonaws.com
+    # s3BucketName:
+    # s3BucketLocation:
+    # s3CacheInsecure: false
+
+    ## GCS settings
+    ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration and https://docs.gitlab.com/runner/install/kubernetes.html#using-cache-with-configuration-template
+    # gcsBucketName:
+
+    ## S3 the name of the secret.
+    # secretName: s3access
+    ## Use this line for access using gcs-access-id and gcs-private-key
+    # secretName: gcsaccess
+    ## Use this line for access using google-application-credentials file
+    # secretName: google-application-credentials
+    ## Use this line for access using Azure with azure-account-name and azure-account-key
+    # secretName: azureaccess
+
+
+  ## Build Container specific configuration
+  ##
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  builds: {}
+    # cpuLimit: 200m
+    # cpuLimitOverwriteMaxAllowed: 400m
+    # memoryLimit: 256Mi
+    # memoryLimitOverwriteMaxAllowed: 512Mi
+    # cpuRequests: 100m
+    # cpuRequestsOverwriteMaxAllowed: 200m
+    # memoryRequests: 128Mi
+    # memoryRequestsOverwriteMaxAllowed: 256Mi
+
+  ## Service Container specific configuration
+  ##
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  services: {}
+    # cpuLimit: 200m
+    # memoryLimit: 256Mi
+    # cpuRequests: 100m
+    # memoryRequests: 128Mi
+
+  ## Helper Container specific configuration
+  ##
+  ## DEPRECATED: See https://docs.gitlab.com/runner/install/kubernetes.html#additional-configuration
+  helpers: {}
+    # cpuLimit: 200m
+    # memoryLimit: 256Mi
+    # cpuRequests: 100m
+    # memoryRequests: 128Mi
+    # image: "registry.gitlab.com/gitlab-org/gitlab-runner/gitlab-runner-helper:x86_64-${CI_RUNNER_REVISION}"
+
+## Configure securitycontext for the main container
+## ref: http://kubernetes.io/docs/user-guide/security-context/
+##
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  privileged: false
+  capabilities:
+    drop: ["ALL"]
+
+## Configure securitycontext valid for the whole pod
+## ref: http://kubernetes.io/docs/user-guide/security-context/
+##
+podSecurityContext:
+  # runAsUser: 100
+  # runAsGroup: 65533
+  # fsGroup: 65533
+  # supplementalGroups: [65533]
+
+  ## Note: values for the ubuntu image:
+  runAsUser: 999
+  fsGroup: 999
+
+## Configure resource requests and limits
+## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+##
+resources:
+  limits:
+    memory: 256Mi
+    cpu: 200m
+  requests:
+    memory: 128Mi
+    cpu: 100m
+
+affinity: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+hostAliases: []
+
+secrets: []
+
+configMaps: {}
+
+volumeMounts: []
+
+volumes: []

@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  db:
+    container_name: db
+    image: registry.cn-shenzhen.aliyuncs.com/lipaysam/mysql:8
+    ports:
+      - 3306:3306
+    volumes:
+      - ./db:/var/lib/mysql
+      - ./conf:/etc/mysql/conf.d
+      - ./logs:/var/log/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: test
+      MYSQL_USER: isadmin
+      MYSQL_PASSWORD: 123456
