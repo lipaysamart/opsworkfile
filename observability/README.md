@@ -79,6 +79,35 @@ helm upgrade --install vmoperator vm/victoria-metrics-operator --version 0.24.0 
 
 ## Tips
 
+### k8s 核心组件监控
+
+- 监控 **kube_proxy** 组件
+
+```sh
+# kube-proxy默认监听的地址是127.0.0.1:10249，如果你是1.26的版本则默认不开启。
+# 修改监听的端口，按如下方法:
+k edit cm kube-proxy -nkube-system
+# 将metricsBindAddress这段修改成metricsBindAddress: 0.0.0.0:10249
+# 重启kube-proxy:
+k get pods -nkube-system | grep kube-proxy | awk '{print $1}' | xargs kubectl delete pods -n kube-system
+```
+
+- 监控 **etcd** 组件
+
+```sh
+# 在 master上修改 /etc/kubernetes/manifests/etcd.yaml 文件
+# 将 command 中修改 --listen-metrics-urls=http://127.0.0.1:2381
+--listen-metrics-urls=http://0.0.0.0:2381
+```
+
+- 监控 **kube_scheduler** 组件和 **kube_controller_manager** 组件
+
+```sh
+# 在 master 路径下 /etc/kubernetes/manifests 找到这两个文件
+# 将 command 中修改 --bind-address=127.0.0.1
+--bind-address=0.0.0.0
+```
+
 ### Alert Debug
 
 > amtool 工具是 alertmanager中自带的用于管理和调试 `Alertmanager`。(需要注意我的 `uri` 是使用过标志 routePrefix 定向到了这个路径 `/alertmanager` )
