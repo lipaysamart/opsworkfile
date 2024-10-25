@@ -1,0 +1,200 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vmalertmanager-main-config
+  namespace: monitor
+stringData:
+  alertmanager.yaml: |-
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: general-default-wechat # 默认接收人
+      group_wait: 30s # 分组内第一个告警等待时间，10s内如有第二个告警会合并一个告警
+      group_interval: 2m  # 发送新告警间隔时间 上下两组发送告警的间隔时间
+      repeat_interval: 4h # 重复告警间隔发送时间，如果没处理过多久再次发送一次
+      group_by: ["severity", "cluster", "alertgroup"]
+      routes:
+        - receiver: cluster-deployment-wechat
+          group_wait: 30s 
+          group_interval: 2m 
+          repeat_interval: 1h
+          group_by: ["cluster", "namespace", "severity", "deployment"]
+          matchers:
+            - alertname=~"KubeDeployment(.+)"
+          continue: false
+        - receiver: cluster-daemonset-wechat
+          group_wait: 30s 
+          group_interval: 2m 
+          repeat_interval: 1h
+          group_by: ["cluster", "namespace", "severity", "daemonset"]
+          matchers:
+            - alertname=~"KubeDaemonSet(.+)"
+          continue: false
+        - receiver: cluster-statefulset-wechat
+          group_wait: 30s 
+          group_interval: 2m 
+          repeat_interval: 1h
+          group_by: ["cluster", "namespace", "severity", "statefulset"]
+          matchers:
+            - alertname=~"KubeStatefulSet(.+)"
+          continue: false
+        - receiver: cluster-storage-wechat
+          group_wait: 30s 
+          group_interval: 2m 
+          repeat_interval: 4h
+          group_by: ["cluster", "namespace", "severity", "persistentvolumeclaim"]
+          matchers:
+            - alertname=~"KubePersistentVolume(.+)"
+          continue: false
+        - receiver: cluster-pod-wechat
+          group_wait: 30s 
+          group_interval: 2m 
+          repeat_interval: 1h
+          group_by: ["cluster", "namespace", "severity", "pod", "container"]
+          matchers:
+            - alertname=~"ConfigReloader(.+)|KubePod(.+)|KubeContainer(.+)"
+          continue: false
+        - receiver: cluster-website-wechat
+          group_wait: 30s 
+          group_interval: 2m 
+          repeat_interval: 1h
+          group_by: ["cluster", "namespace", "instance"]
+          matchers: 
+            - alertname=~"Blackbox(.+)"
+        - receiver: vm-health-wechat
+          group_wait: 30s 
+          group_interval: 2m 
+          repeat_interval: 1h
+          group_by: ["cluster", "scrape_job"]
+          matchers: 
+            - alertgroup=~"vmagent|vm-health|component(.*)"
+          continue: false
+        - receiver: blackhole
+          repeat_interval: 9999h
+          matchers:
+            - severity=~"info|none"
+        - receiver: cluster-node-wechat
+          group_wait: 30s 
+          group_interval: 2m 
+          repeat_interval: 1h
+          group_by: ["cluster", "instance", "alertname"]
+          matchers: 
+            - alertgroup=~"node-exporter"
+          continue: false
+    receivers:
+      - name: 'blackhole'
+        webhook_configs:
+          - url: "http://blackhole/"
+            send_resolved: false
+      - name: 'general-default-wechat'
+        webhook_configs:
+          - url: "http://prometheus-alert:8080/prometheusalert?type=wx&tpl=general_default_wechat&wxurl="
+            send_resolved: false
+      - name: 'cluster-deployment-wechat'
+        webhook_configs:
+          - url: "http://prometheus-alert:8080/prometheusalert?type=wx&tpl=cluster_deployment_wechat&wxurl="
+            send_resolved: true
+      - name: 'cluster-daemonset-wechat'
+        webhook_configs:
+          - url: "http://prometheus-alert:8080/prometheusalert?type=wx&tpl=cluster_daemonset_wechat&wxurl="
+            send_resolved: true
+      - name: 'cluster-statefulset-wechat'
+        webhook_configs:
+          - url: "http://prometheus-alert:8080/prometheusalert?type=wx&tpl=cluster_statefulset_wechat&wxurl="
+            send_resolved: true
+      - name: 'cluster-storage-wechat'
+        webhook_configs:
+          - url: "http://prometheus-alert:8080/prometheusalert?type=wx&tpl=cluster_storage_wechat&wxurl="
+            send_resolved: true
+      - name: 'cluster-pod-wechat'
+        webhook_configs:
+          - url: "http://prometheus-alert:8080/prometheusalert?type=wx&tpl=cluster_pod_wechat&wxurl="
+            send_resolved: true
+      - name: 'cluster-website-wechat'
+        webhook_configs:
+          - url: "http://prometheus-alert:8080/prometheusalert?type=wx&tpl=cluster_website_wechat&wxurl="
+            send_resolved: true
+      - name: 'cluster-node-wechat'
+        webhook_configs:
+          - url: "http://prometheus-alert:8080/prometheusalert?type=wx&tpl=cluster_node_wechat&wxurl="
+            send_resolved: true
+
+    time_intervals:
+      - name: switch
+        time_intervals:
+        - times:
+          - start_time: '14:00' # 夜班上班时间 CNT/22:00
+            end_time: '23:00' # 早班上班时间 CNT/7:00
+          location: Local
+      - name: idle
+        time_intervals:
+        - times:
+          - start_time: '09:00' # 白班下班时间 CNT/17:00
+            end_time: '14:00' # 夜班上班时间 CNT/22:00
+          location: Local
+      - name: week
+        time_intervals:
+        - weekdays: 
+            - sunday # 星期天 CNT/08:00
+          location: Local
+
+    # inhibit_rules:
+    # - source_matchers:
+    #     - alertname=~"KubeStatefulSet(.+)|KubeDeployment(.+)|KubeDaemonSet(.+)"
+    #   target_matchers:
+    #     - alertname=~"ConfigReloader(.+)|KubePod(.+)|KubeContainer(.+)"
+    #   equal:
+    #   - severity
+    # - source_matchers:
+    #     - alertname=~"KubePersistentVolumeFillingUp|KubePersistentVolumeInodesFillingUp"
+    #   target_matchers:
+    #     - alertname=~"KubePersistentVolumeFillingUp|KubePersistentVolumeInodesFillingUp"
+    #   equal:
+    #   - severity
+    # - source_matchers:
+    #     - alertname=~"PrivateNetPingDown"
+    #   target_matchers:
+    #     - alertname=~"PublicNetPingDown"
+    #   equal:
+    #   - severity
+type: Opaque
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlertmanager
+metadata:
+  name: main
+  namespace: monitor
+spec:
+  replicaCount: 1
+  externalURL: https://${HOST}/alertmanager/
+  routePrefix: "/alertmanager"
+  image:
+    repository: quay.io/prometheus/alertmanager
+    tag: v0.25.0
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 50m
+      memory: 100Mi
+  retention: 120h
+  configSelector: {}
+  configSecret: vmalertmanager-main-config
+  configNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: monitor
+  tolerations:
+    - key: ack-pool-name
+      value: prod
+      effect: NoSchedule
+      operator: Equal
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+        storageClassName: default

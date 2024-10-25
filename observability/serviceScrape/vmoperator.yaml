@@ -1,0 +1,19 @@
+---
+# Source: victoria-metrics-operator/templates/service_scrape.yaml
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: vmoperator-victoria-metrics-operator
+  namespace: monitor
+  labels:
+    app.kubernetes.io/name: victoria-metrics-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics-operator
+  endpoints:
+    - port: http
+      interval: 60s
+  namespaceSelector:
+    matchNames:
+      - monitor

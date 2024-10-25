@@ -1,0 +1,21 @@
+---
+# Source: victoria-metrics-k8s-stack/templates/servicemonitors/kube-state-metrics.yaml
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: victoria-metrics-kube-state-metrics
+  namespace: monitor
+  labels: 
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/version: "v1.101.0"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  endpoints:
+  - port: http
+    honorLabels: true
+    metricRelabelConfigs:
+      - action: labeldrop
+        regex: (uid|container_id|image_id)
+  jobLabel: app.kubernetes.io/name

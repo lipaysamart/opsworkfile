@@ -1,0 +1,45 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: rabbitmq
+  namespace: monitor
+spec:
+  endpoints:
+    - interval: 60s
+      port: tcp
+  namespaceSelector:
+    matchNames:
+      - monitor
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: rabbitmq
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: rabbitmq
+  namespace: monitor
+subsets:
+  - addresses:
+      - ip: <rabbit-mq>
+    ports:
+      - name: tcp
+        port: 15692
+        protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+  labels:
+    app.kubernetes.io/component: rabbitmq
+  name: rabbitmq
+  namespace: monitor
+spec:
+  ports:
+    - name: tcp
+      port: 15692
+      protocol: TCP
+      targetPort: 15692
+  sessionAffinity: None
+  type: ClusterIP

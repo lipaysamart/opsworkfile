@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vmagent
+  namespace: monitor
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vmagent
+rules:
+  - apiGroups: ["","networking.k8s.io","extensions","discovery.k8s.io"]
+    resources:
+      - nodes
+      - nodes/metrics
+      - nodes/proxy
+      - services
+      - endpoints
+      - endpointslices
+      - pods
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - configmaps
+      - secrets
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics","/metrics/resources"]
+    verbs: ["get"]
+  - apiGroups:
+      - route.openshift.io
+      - image.openshift.io
+    resources:
+      - routers/metrics
+      - registry/metrics
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vmagent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vmagent
+subjects:
+  - kind: ServiceAccount
+    name: vmagent
+    namespace: monitor
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAgent
+metadata:
+  name: main
+  namespace: monitor
+spec:
+  serviceAccountName: vmagent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "500Mi"
+    limits:
+      cpu: "500m"
+      memory: "1.5Gi"
+  selectAllByDefault: false
+  scrapeInterval: "60s"
+  logFormat: "json"
+  logLevel: "INFO"
+  externalLabels: 
+    cluster: "ack-hk-01"
+  extraArgs:
+    # 缓存可以占用系统内存百分比
+    memory.allowedPercent: "40"
+    promscrape.dropOriginalLabels: "true"
+    promscrape.streamParse: "true"
+    promscrape.maxScrapeSize: "100MB"
+    promscrape.suppressDuplicateScrapeTargetErrors: "true"
+  tolerations:
+  - key: ack-pool-name
+    operator: Exists
+    effect: NoSchedule
+  image:
+    tag: v1.93.15
+  remoteWrite:
+    - url: "http://vmsingle-victoria-metrics:8429/prometheus/api/v1/write"
+  serviceScrapeSelector: {}
+  serviceScrapeNamespaceSelector: 
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values: ["monitor", "default"]
+  podScrapeNamespaceSelector: {}
+  podScrapeSelector: {}
+  nodeScrapeSelector: {}
+  nodeScrapeNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: monitor
+  staticScrapeSelector: {}
+  staticScrapeNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: monitor
+  probeSelector: {}
+  probeNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: monitor

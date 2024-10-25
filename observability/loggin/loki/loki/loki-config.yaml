@@ -1,0 +1,179 @@
+---
+# Source: loki/templates/config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki
+  namespace: loggin
+  labels:
+    helm.sh/chart: loki-6.12.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "3.1.1"
+data:
+  config.yaml: |
+    auth_enabled: true
+    chunk_store_config:
+      chunk_cache_config:
+        background:
+          writeback_buffer: 500000
+          writeback_goroutines: 1
+          writeback_size_limit: 500MB
+        default_validity: 0s
+        memcached:
+          batch_size: 4
+          parallelism: 5
+        memcached_client:
+          addresses: dnssrvnoa+_memcached-client._tcp.loki-chunks-cache.loggin.svc
+          consistent_hash: true
+          max_idle_conns: 72
+          timeout: 2000ms
+    common:
+      compactor_address: 'http://loki-backend:3100'
+      path_prefix: /var/loki
+      replication_factor: 1
+    frontend:
+      scheduler_address: ""
+      tail_proxy_url: ""
+      max_outstanding_per_tenant: 2048
+    frontend_worker:
+      scheduler_address: ""
+    index_gateway:
+      mode: simple
+    ingester:
+      # 块的目标“压缩”大小（以字节为单位）。这是一个期望的大小，而不是精确的大小。
+      chunk_target_size: 1572864
+      # 块的目标“未压缩”大小（以字节为单位）。当超过此阈值时，头块将在块内部剪切并压缩。
+      chunk_block_size: 262144
+      # 用于压缩块的算法。（none、gzip、lz4-64k、snappy、lz4-256k、lz4-1M、lz4、flate、zstd）
+      chunk_encoding: snappy
+      # 如果块未达到最大块大小，则块在没有更新的情况下在内存中停留多长时间后进行刷新。
+      chunk_idle_period: 30m
+      # 块在刷新后在内存中保留的持续时间。
+      chunk_retain_period: 30s
+      # 内存中时间序列块的最大持续时间。如果一个时间序列运行时间超过此值，当前块将被刷新到存储中，并创建一个新的块。
+      max_chunk_age: 1h
+      wal:
+        # 在重放期间WAL可以使用的最大内存大小。达到此限制后，它将在继续之前将数据刷新到存储中。可以应用单位后缀（KB、MB、GB）。
+        replay_memory_ceiling: "1GB"
+    limits_config:
+      # 每个流每秒的最大字节速率。
+      per_stream_rate_limit: 3MB
+      # 每个流的最大突发字节数
+      per_stream_rate_limit_burst: 15MB
+      # 每个租户的摄取速率限制，以每秒样本大小为单位。单位为MB。
+      ingestion_rate_mb: 4
+      # 每个租户允许的摄取突发大小（以样本大小为单位）。单位为MB。即使在“global”策略下，突发大小也是指每个分发器的本地速率限制器，并且应该设置为单个推送请求中预期的最大日志大小。
+      ingestion_burst_size_mb: 10
+      # 每个标签集的标签名称的最大数量。
+      max_label_names_per_series: 30
+      # 每个租户允许缓存的最新结果，以防止缓存可能仍在变动的最新结果。
+      max_cache_freshness_per_query: 10m
+      # 是否拒绝旧样本。  
+      reject_old_samples: true
+      # 拒绝之前的样本的最大接受时间。
+      reject_old_samples_max_age: 1w
+      query_timeout: 300s
+      # Enable log-volume endpoints.
+      volume_enabled: true
+      # 查询返回的最大日志条目数。
+      max_entries_limit_per_query: 5000
+      # 限制查询返回的唯一标签集的最大数量。当达到限制时，将返回错误 (default 500)。
+      max_query_series: 100000
+      # 按时间间隔拆分查询并并行执行。值为0禁用按时间拆分。
+      split_queries_by_interval: 24h
+      # 最大并行查询
+      max_query_parallelism: 64
+      # 自动分片配置
+      shard_streams:
+        enabled: true
+        # 记录分片的日志，不推荐生产环境下开启
+        logging_enabled: false
+        desired_rate: 1536
+    memberlist:
+      join_members:
+      - loki-memberlist
+    pattern_ingester:
+      enabled: true
+    querier:
+      max_concurrent: 4
+    query_range:
+      align_queries_with_step: true
+      cache_results: true
+      results_cache:
+        cache:
+          background:
+            writeback_buffer: 500000
+            writeback_goroutines: 1
+            writeback_size_limit: 500MB
+          default_validity: 12h
+          memcached_client:
+            addresses: dnssrvnoa+_memcached-client._tcp.loki-results-cache.loggin.svc
+            consistent_hash: true
+            timeout: 500ms
+            update_interval: 1m
+    ruler:
+      alertmanager_url: https://${HOST/alertmanager/
+      external_url: https://${HOST/alertmanager/
+      alertmanager_client:
+        basic_auth_username: isadmin
+        basic_auth_password: isadmin
+      evaluation_interval: 3m
+      enable_alertmanager_v2: true
+      notification_timeout: 30s
+      enable_api: true
+      rule_path: /tmp/rules
+      storage:
+        local:
+          directory: "/var/rules"
+    runtime_config:
+      file: /etc/loki/runtime-config/runtime-config.yaml
+    schema_config:
+      configs:
+      - from: "2024-04-01"
+        index:
+          period: 24h
+          prefix: loki_index_
+        object_store: alibabacloud
+        schema: v13
+        store: tsdb
+    server:
+      grpc_listen_port: 9095
+      http_listen_port: 3100
+      http_server_read_timeout: 600s
+      http_server_write_timeout: 600s
+    storage_config:
+      alibabacloud:
+        bucket: "loki"
+        endpoint: "oss-cn-hongkong-internal.aliyuncs.com"
+        access_key_id: "xxxxxxxxx"
+        secret_access_key: "xxxxxxxxx"
+      hedging:
+        at: 250ms
+        max_per_second: 20
+        up_to: 3
+      tsdb_shipper:
+        index_gateway_client:
+          server_address: dns+loki-backend-headless.loggin.svc.cluster.local:9095
+    compactor:
+      # 重新运行压缩操作的间隔。
+      compaction_interval: 10m
+      # 应用/执行保留的间隔时间。0表示与压缩间隔相同的间隔运行。如果非零，则应始终是压缩间隔的倍数。
+      apply_retention_interval: 0
+    tracing:
+      enabled: true
+---
+# Source: loki/templates/runtime-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-runtime
+  namespace: loggin
+  labels:
+    helm.sh/chart: loki-6.12.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "3.1.1"
+data:
+  runtime-config.yaml: |
+    {}

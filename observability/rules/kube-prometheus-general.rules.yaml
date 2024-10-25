@@ -1,0 +1,19 @@
+---
+# Source: victoria-metrics-k8s-stack/templates/rules/kube-prometheus-general.rules.yaml
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  namespace: monitor
+  name: victoria-metrics-kube-prometheus-general.rules
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/instance: vm-operator
+    app.kubernetes.io/version: "v1.101.0"
+spec:
+  groups:
+  - name: kube-prometheus-general.rules
+    rules:
+    - expr: count without(instance, pod, node) (up == 1)
+      record: count:up1
+    - expr: count without(instance, pod, node) (up == 0)
+      record: count:up0

@@ -1,0 +1,21 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  namespace: monitor
+  name: component-target-down
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/instance: vm-operator
+    app.kubernetes.io/version: "v1.101.0"
+spec:
+  groups:
+  - name: component-target-down
+    rules:
+      - alert: ComponentTargetDown
+        expr: 'vm_promscrape_scrape_pool_targets{status="up"} == 0'
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Scrape Error {{ $labels.scrape_job }} Component Target Down.)"
+          description: "Scrape failed duration 3 minute for {{ $labels.scrape_job }} Component Target Down\n  VALUE = {{ $value }}"

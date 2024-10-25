@@ -1,0 +1,40 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAuth
+metadata:
+  name: main
+  namespace: monitor
+spec:
+  podMetadata:
+    labels:
+      component: vmauth
+  userSelector: {}
+  userNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: monitor
+  image:
+    tag: v1.93.15
+  tolerations:
+    - key: ack-pool-name
+      value: prod
+      operator: Equal
+      effect: NoSchedule
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "50Mi"
+    limits:
+      cpu: "200m"
+      memory: "200Mi"
+  ingress:
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+      nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+      nginx.ingress.kubernetes.io/client-body-buffer-size: 15m
+      nginx.ingress.kubernetes.io/proxy-body-size: 100m
+    #   cert-manager.io/cluster-issuer: letsencrypt
+    class_name: nginx
+    tlsHosts:
+      - ${HOST}
+    tlsSecretName: vmauth-com-tls

@@ -1,0 +1,201 @@
+---
+# Source: loki/templates/write/poddisruptionbudget-write.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: loki-write
+  namespace: loggin
+  labels:
+    helm.sh/chart: loki-6.12.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "3.1.1"
+    app.kubernetes.io/component: write
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+      app.kubernetes.io/instance: loki
+      app.kubernetes.io/component: write
+  maxUnavailable: 1
+---
+# Source: loki/templates/write/service-write-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-write-headless
+  namespace: loggin
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/component: write
+    variant: headless
+  annotations:
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http-metrics
+      port: 3100
+      targetPort: http-metrics
+      protocol: TCP
+    - name: grpc
+      port: 9095
+      targetPort: grpc
+      protocol: TCP
+      appProtocol: tcp
+  selector:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/component: write
+---
+# Source: loki/templates/write/service-write.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-write
+  namespace: loggin
+  labels:
+    helm.sh/chart: loki-6.12.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "3.1.1"
+    app.kubernetes.io/component: write
+  annotations:
+spec:
+  type: ClusterIP
+  ports:
+    - name: http-metrics
+      port: 3100
+      targetPort: http-metrics
+      protocol: TCP
+    - name: grpc
+      port: 9095
+      targetPort: grpc
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/component: write
+---
+# Source: loki/templates/write/statefulset-write.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: loki-write
+  namespace: loggin
+  labels:
+    helm.sh/chart: loki-6.12.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "3.1.1"
+    app.kubernetes.io/component: write
+    app.kubernetes.io/part-of: memberlist
+spec:
+  replicas: 3
+  podManagementPolicy: Parallel
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+  serviceName: loki-write-headless
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+      app.kubernetes.io/instance: loki
+      app.kubernetes.io/component: write
+  template:
+    metadata:
+      annotations:
+        checksum/config: cb298b93b21f9125d2d16b73409c5cb5e42ccb3952bcc98b9de61e4e9f236f27
+      labels:
+        app.kubernetes.io/name: loki
+        app.kubernetes.io/instance: loki
+        app.kubernetes.io/component: write
+        app.kubernetes.io/part-of: memberlist
+    spec:
+      serviceAccountName: loki
+      automountServiceAccountToken: true
+      enableServiceLinks: true
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: loki
+          image: docker.io/grafana/loki:3.1.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - -config.file=/etc/loki/config/config.yaml
+            - -target=write
+          ports:
+            - name: http-metrics
+              containerPort: 3100
+              protocol: TCP
+            - name: grpc
+              containerPort: 9095
+              protocol: TCP
+            - name: http-memberlist
+              containerPort: 7946
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http-metrics
+            initialDelaySeconds: 30
+            timeoutSeconds: 1
+          volumeMounts:
+            - name: config
+              mountPath: /etc/loki/config
+            - name: runtime-config
+              mountPath: /etc/loki/runtime-config
+            - name: data
+              mountPath: /var/loki
+          resources:
+            requests:
+              memory: 4Gi
+              cpu: 100m
+            limits:
+              memory: 8Gi
+              cpu: 200m
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: write
+              topologyKey: kubernetes.io/hostname
+      volumes:
+        - name: config
+          configMap:
+            name: loki
+            items:
+              - key: "config.yaml"
+                path: "config.yaml"
+        - name: runtime-config
+          configMap:
+            name: loki-runtime
+      tolerations:
+        - key: ack-pool-name
+          value: prod
+          operator: Equal
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        storageClassName: default
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: "20Gi"

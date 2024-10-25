@@ -1,0 +1,257 @@
+# Default values for fluent-bit.
+
+# kind -- DaemonSet or Deployment
+kind: DaemonSet
+
+image:
+  repository: cr.fluentbit.io/fluent/fluent-bit
+  # Overrides the image tag whose default is {{ .Chart.AppVersion }}
+  # Set to "-" to not use the default value
+  tag:
+  digest:
+  pullPolicy: IfNotPresent
+
+testFramework:
+  enabled: true
+  namespace:
+  image:
+    repository: busybox
+    pullPolicy: Always
+    tag: latest
+    digest:
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name:
+
+rbac:
+  create: true
+  nodeAccess: true
+  eventsAccess: true
+
+# 抓取 kernel 日志必须使用特权
+securityContext:
+  privileged: true
+#   capabilities:
+#     drop:
+#     - ALL
+#   readOnlyRootFilesystem: true
+#   runAsNonRoot: true
+#   runAsUser: 1000
+
+serviceMonitor:
+  enabled: false
+
+prometheusRule:
+  enabled: false
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations:
+  - key: ack-pool-name
+    operator: Exists
+
+affinity: {}
+
+labels: {}
+
+annotations: {}
+
+podAnnotations: {}
+
+podLabels: {}
+
+env:
+  - name: NODE_NAME
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: spec.nodeName
+
+envFrom: []
+
+flush: 10
+
+metricsPort: 2020
+
+extraVolumes: []
+
+extraVolumeMounts: []
+
+# Make use of a pre-defined configmap instead of the one templated here
+existingConfigMap: ""
+
+## https://docs.fluentbit.io/manual/administration/configuring-fluent-bit/classic-mode/configuration-file
+config:
+  service: |
+    [SERVICE]
+        Daemon Off
+        Flush {{ .Values.flush }}
+        Log_Level {{ .Values.logLevel }}
+        Parsers_File /fluent-bit/etc/parsers.conf
+        Parsers_File /fluent-bit/etc/conf/custom_parsers.conf
+        HTTP_Server On
+        HTTP_Listen 0.0.0.0
+        HTTP_Port {{ .Values.metricsPort }}
+        Health_Check On
+        Hot_Reload true
+
+  ## https://docs.fluentbit.io/manual/pipeline/inputs
+  inputs: |
+    [INPUT]
+        Name tail
+        Tag nginx.*
+        Path /var/log/containers/nginx-ingress-controller*.log
+        Refresh_Interval 10
+        Skip_Long_Lines true
+        DB /fluent-bit/tail/pos.db
+        DB.Sync Normal
+        Mem_Buf_Limit 5MB
+        multiline.parser docker,cri
+    [INPUT]
+        Name systemd
+        Tag kubelet
+        Systemd_Filter _SYSTEMD_UNIT=kubelet.service
+        Read_From_Tail On
+    [INPUT]
+        Name kmsg
+        Tag kernel
+        Prio_Level 8
+
+  ## https://docs.fluentbit.io/manual/pipeline/filters
+  filters: |
+    [FILTER]
+        Name parser
+        Match nginx.*
+        Key_Name log
+        Parser k8s_nginx
+    [FILTER]
+        Name Modify
+        Match kernel
+        Add job kernel
+    [FILTER]
+        Name Modify
+        Match nginx.*
+        Add job nginx
+        Rename log msg
+    [FILTER]
+        Name stdout
+        Match nginx.*
+    [FILTER]
+        Name Modify
+        Match kubelet
+        Add job kubelet
+        Rename PRIORITY priority
+        Rename MESSAGE msg
+        Remove SYSLOG_IDENTIFIER 
+        Remove SYSLOG_FACILITY
+        Remove_regex ^_.*
+
+  ## https://docs.fluentbit.io/manual/pipeline/outputs
+  outputs: |
+    [OUTPUT]
+        Name loki
+        Host loki-gateway.loggin.svc
+        # http_user isadmin
+        # http_passwd isadmin
+        Match *
+        port 80
+        tenant_id tenant_1 
+        labels cluster=tenant_1,hostname=${NODE_NAME},http_host=$host,http_code=$code,geoip_country_code=$country
+        label_keys $job
+        structured_metadata message=$msg
+        line_format json
+        auto_kubernetes_labels off
+
+  ## https://docs.fluentbit.io/manual/administration/configuring-fluent-bit/classic-mode/upstream-servers
+  ## This configuration is deprecated, please use `extraFiles` instead.
+  upstream: {}
+
+  ## https://docs.fluentbit.io/manual/pipeline/parsers
+  customParsers: |
+    [PARSER]
+        Name        k8s_nginx
+        Format      regex
+        Regex       ^(?<remote_addr>\S+) - (?<remote_addrs>[^ ]*) - (?<user>[^ ]*) \[(?<time_local>[^\]]*)\] "(?<method>\S+)(?: +(?<path>[^\"]*?)(?: +\S*)?)?" (?<code>[^ ]*) (?<body_size>[^ ]*) "(?<referer>[^\"]*)" "(?<agent>[^\"]*)" (?<request_length>[^ ]*) (?<request_time>[^ ]*) \[(?<proxy_upstream_name>[^ ]*)\] (?<upstream_addr>[^ ]*) (?<upstream_response_length>[^ ]*) (?<upstream_response_time>[^ ]*) (?<upstream_status>[^ ]*) (?<reg_id>[^ ]*) (?<host>[^ ]*) (?<country>[^ ]*)
+        Time_Key    time
+        Time_Format %d/%b/%Y:%H:%M:%S %z
+
+  # This allows adding more files with arbitrary filenames to /fluent-bit/etc/conf by providing key/value pairs.
+  # The key becomes the filename, the value becomes the file content.
+  extraFiles: {}
+#     upstream.conf: |
+#       [UPSTREAM]
+#           upstream1
+#
+#       [NODE]
+#           name       node-1
+#           host       127.0.0.1
+#           port       43000
+#     example.conf: |
+#       [OUTPUT]
+#           Name example
+#           Match foo.*
+#           Host bar
+
+# The config volume is mounted by default, either to the existingConfigMap value, or the default of "fluent-bit.fullname"
+volumeMounts:
+  - name: config
+    mountPath: /fluent-bit/etc/conf
+
+daemonSetVolumes:
+  - name: varlog
+    hostPath:
+      path: /var/log
+  - name: varlibdockercontainers
+    hostPath:
+      path: /var/lib/docker/containers
+  - name: etcmachineid
+    hostPath:
+      path: /etc/machine-id
+      type: File
+  - name: systemd
+    hostPath:
+      path: /var/log/journal
+      type: ""
+  - emptyDir: {}
+    name: positions
+
+daemonSetVolumeMounts:
+  - name: varlog
+    mountPath: /var/log
+  - name: varlibdockercontainers
+    mountPath: /var/lib/docker/containers
+    readOnly: true
+  - name: etcmachineid
+    mountPath: /etc/machine-id
+    readOnly: true
+  - name: systemd
+    mountPath: /var/log/journal
+    readOnly: true
+  - mountPath: /fluent-bit/tail
+    name: positions
+
+command:
+  - /fluent-bit/bin/fluent-bit
+
+args:
+  - --workdir=/fluent-bit/etc
+  - --config=/fluent-bit/etc/conf/fluent-bit.conf
+
+logLevel: info
+
+hotReload:
+  enabled: true
+  image:
+    repository: ghcr.io/jimmidyson/configmap-reload
+    tag: v0.11.1
+    digest:
+    pullPolicy: IfNotPresent
+  resources: {}

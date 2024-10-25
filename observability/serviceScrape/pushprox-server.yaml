@@ -1,0 +1,19 @@
+---
+# Source: victoria-metrics-k8s-stack/templates/servicemonitors/nodeexporter.yaml
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: pushprox-server
+  namespace: monitor
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/instance: vm-operator
+    app.kubernetes.io/version: "v1.101.0"
+spec:
+  selector:
+    matchLabels:
+      app: pushprox-server
+  endpoints:
+    - port: http
+      interval: 60s
+  jobLabel: pushprox-server

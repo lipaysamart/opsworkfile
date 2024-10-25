@@ -1,0 +1,57 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  namespace: monitor
+  name: windows-server
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/instance: vm-operator
+    app.kubernetes.io/version: "v1.101.0"
+spec:
+  groups:
+    - name: windows-server-general
+      rules:
+        - alert: WindowsServerCollectorError
+          expr: "windows_exporter_collector_success == 0"
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Windows Server collector Error (instance {{ $labels.instance }})
+            description: "Collector {{ $labels.collector }} was not successful\n  VALUE = {{ $value }}\n  HOST = {{ $labels.instance }}"
+
+        - alert: WindowsServerServiceStatus
+          expr: 'windows_service_status{status="ok"} != 1'
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Windows Server service Status (instance {{ $labels.instance }})
+            description: "Windows Service state is not OK duration 5 minute\n  VALUE = {{ $value }}\n  HOST = {{ $labels.instance }}"
+
+        - alert: WindowsServerCpuUsage
+          expr: '100 - (avg by (instance,host,state) (rate(windows_cpu_time_total{mode="idle"}[2m])) * 100) > 85'
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Windows Server CPU Usage (instance {{ $labels.instance }})
+            description: "CPU Usage is more than 85% duration 5 minute\n  VALUE = {{ $value }}\n  HOST = {{ $labels.instance }}"
+
+        - alert: WindowsServerMemoryUsage
+          expr: "100 - ((windows_os_physical_memory_free_bytes / windows_cs_physical_memory_bytes) * 100) > 95"
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Windows Server memory Usage (instance {{ $labels.instance }})
+            description: "Memory usage is more than 95% duration 5 minute\n  VALUE = {{ $value }}\n  HOST = {{ $labels.instance }}"
+
+        - alert: WindowsServerDiskSpaceUsage
+          expr: "100.0 - 100 * ((windows_logical_disk_free_bytes / 1024 / 1024 ) / (windows_logical_disk_size_bytes / 1024 / 1024)) > 95"
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: Windows Server disk Space Usage (instance {{ $labels.instance }})
+            description: "{{ $labels.volume }} Disk usage is more than 95%\n  VALUE = {{ $value }}\n  HOST = {{ $labels.instance }}"

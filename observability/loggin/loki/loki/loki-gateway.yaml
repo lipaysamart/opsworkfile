@@ -1,0 +1,332 @@
+---
+# Source: loki/templates/gateway/configmap-gateway.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-gateway
+  namespace: loggin
+  labels:
+    helm.sh/chart: loki-6.12.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "3.1.1"
+    app.kubernetes.io/component: gateway
+data:
+  nginx.conf: |
+    worker_processes  5;  ## Default: 1
+    error_log  /dev/stderr;
+    pid        /tmp/nginx.pid;
+    worker_rlimit_nofile 8192;
+
+    events {
+      worker_connections  4096;  ## Default: 1024
+    }
+
+    http {
+      client_body_temp_path /tmp/client_temp;
+      proxy_temp_path       /tmp/proxy_temp_path;
+      fastcgi_temp_path     /tmp/fastcgi_temp;
+      uwsgi_temp_path       /tmp/uwsgi_temp;
+      scgi_temp_path        /tmp/scgi_temp;
+
+      client_max_body_size  100M;
+
+      proxy_read_timeout    600; ## 10 minutes
+      proxy_send_timeout    600;
+      proxy_connect_timeout 600;
+
+      proxy_http_version    1.1;
+
+      default_type application/octet-stream;
+      log_format   main '$remote_addr - $remote_user [$time_local]  $status '
+            '"$request" $body_bytes_sent "$http_referer" '
+            '"$http_user_agent" "$http_x_forwarded_for"';
+      access_log   /dev/stderr  main;
+
+      sendfile     on;
+      tcp_nopush   on;
+      resolver kube-dns.kube-system.svc.cluster.local.;
+      
+
+      server {
+        listen             8080;
+        listen             [::]:8080;
+
+        location = / {
+          return 200 'OK';
+          auth_basic off;
+        }
+
+        ########################################################
+        # Configure backend targets# Distributor
+        location = /api/prom/push {
+          proxy_pass       http://loki-write.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /loki/api/v1/push {
+          proxy_pass       http://loki-write.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /distributor/ring {
+          proxy_pass       http://loki-write.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /otlp/v1/logs {
+          proxy_pass       http://loki-write.loggin.svc.cluster.local:3100$request_uri;
+        }
+
+        # Ingester
+        location = /flush {
+          proxy_pass       http://loki-write.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location ^~ /ingester/ {
+          proxy_pass       http://loki-write.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /ingester {
+          internal;        # to suppress 301
+        }
+
+        # Ring
+        location = /ring {
+          proxy_pass       http://loki-write.loggin.svc.cluster.local:3100$request_uri;
+        }
+
+        # MemberListKV
+        location = /memberlist {
+          proxy_pass       http://loki-write.loggin.svc.cluster.local:3100$request_uri;
+        }
+
+        # Ruler
+        location = /ruler/ring {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /api/prom/rules {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location ^~ /api/prom/rules/ {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /loki/api/v1/rules {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location ^~ /loki/api/v1/rules/ {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /prometheus/api/v1/alerts {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /prometheus/api/v1/rules {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+
+        # Compactor
+        location = /compactor/ring {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /loki/api/v1/delete {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /loki/api/v1/cache/generation_numbers {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+
+        # IndexGateway
+        location = /indexgateway/ring {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+
+        # QueryScheduler
+        location = /scheduler/ring {
+          proxy_pass       http://loki-backend.loggin.svc.cluster.local:3100$request_uri;
+        }
+
+        # Config
+        location = /config {
+          proxy_pass       http://loki-write.loggin.svc.cluster.local:3100$request_uri;
+        }
+
+
+        # QueryFrontend, Querier
+        location = /api/prom/tail {
+          proxy_pass       http://loki-read.loggin.svc.cluster.local:3100$request_uri;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+        }
+        location = /loki/api/v1/tail {
+          proxy_pass       http://loki-read.loggin.svc.cluster.local:3100$request_uri;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+        }
+        location ^~ /api/prom/ {
+          proxy_pass       http://loki-read.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /api/prom {
+          internal;        # to suppress 301
+        }
+        location ^~ /loki/api/v1/ {
+          proxy_pass       http://loki-read.loggin.svc.cluster.local:3100$request_uri;
+        }
+        location = /loki/api/v1 {
+          internal;        # to suppress 301
+        }
+      }
+    }
+---
+# Source: loki/templates/gateway/service-gateway.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-gateway
+  namespace: loggin
+  labels:
+    helm.sh/chart: loki-6.12.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "3.1.1"
+    app.kubernetes.io/component: gateway
+  annotations:
+spec:
+  type: ClusterIP
+  ports:
+    - name: http-metrics
+      port: 80
+      targetPort: http-metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/component: gateway
+---
+apiVersion: v1
+data:
+  auth: aXNhZG1pbjokYXByMSRkbGNkd1g1eCRONlFUNUlNN3VMekNpMmZQSmt0dEkwCg==
+kind: Secret
+metadata:
+  name: loki-auth
+  namespace: loggin
+type: Opaque
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: loki-gateway
+  namespace: loggin
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic # 认证类型
+    nginx.ingress.kubernetes.io/auth-secret: loki-auth # 包含 user/password 定义的 secret 对象名
+    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required - foo" # 要显示的带有适当上下文的消息，说明需要身份验证的原因
+    nginx.ingress.kubernetes.io/client-body-buffer-size: 4m
+    nginx.ingress.kubernetes.io/proxy-body-size: 100m
+    cert-manager.io/cluster-issuer: zerossl
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    prometheus.io/probe: "true"
+spec:
+  ingressClassName: nginx # 使用 nginx 的 IngressClass（关联的 ingress-nginx 控制器）
+  rules:
+    - host: ${HOST} # 将域名映射到 my-nginx 服务
+      http:
+        paths:
+          - backend:
+              service:
+                name: loki-gateway
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - ${HOST}
+      secretName: loki-gateway-tls
+---
+# Source: loki/templates/gateway/deployment-gateway-nginx.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki-gateway
+  namespace: loggin
+  labels:
+    helm.sh/chart: loki-6.12.0
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "3.1.1"
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+      app.kubernetes.io/instance: loki
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      annotations:
+        checksum/config: 21aa9ce66d13b2335f75725c2a727c3f11c626618b34213aa8d993b02dc2bbde
+      labels:
+        app.kubernetes.io/name: loki
+        app.kubernetes.io/instance: loki
+        app.kubernetes.io/component: gateway
+    spec:
+      serviceAccountName: loki
+      enableServiceLinks: true
+
+      securityContext:
+        fsGroup: 101
+        runAsGroup: 101
+        runAsNonRoot: true
+        runAsUser: 101
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: nginx
+          image: docker.io/nginxinc/nginx-unprivileged:1.27-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http-metrics
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http-metrics
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx
+            - name: tmp
+              mountPath: /tmp
+            - name: docker-entrypoint-d-override
+              mountPath: /docker-entrypoint.d
+          resources:
+            requests:
+              cpu: 150m
+              memory: 500Mi
+            limits:
+              cpu: 500m
+              memory: 2048Mi
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: gateway
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: ack-pool-name
+          value: prod
+          operator: Equal
+      volumes:
+        - name: config
+          configMap:
+            name: loki-gateway
+        - name: tmp
+          emptyDir: {}
+        - name: docker-entrypoint-d-override
+          emptyDir: {}

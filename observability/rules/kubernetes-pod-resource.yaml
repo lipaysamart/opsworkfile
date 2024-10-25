@@ -1,0 +1,51 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/instance: vm-operator
+    app.kubernetes.io/version: "v1.101.0"
+  name: kubernetes-pod-rules
+  namespace: monitor
+spec:
+  groups:
+    - name: k8s-prom-pod
+      rules:
+        - alert: PodCpu85
+          annotations:
+            description:
+              The CPU usage of {{ $labels.namespace }}.{{ $labels.pod }} is
+              greater than 85%, and the current value is {{ printf "%.2f" $value }}%.
+          expr: |
+            100 * (sum(rate(container_cpu_usage_seconds_total{id!="/"}[5m])) by (pod,namespace,container,cluster) / sum(kube_pod_container_resource_limits{resource="cpu"}) by (pod,namespace,container,cluster)) > 85
+          for: 5m
+          labels:
+            severity: warning
+        - alert: PodMemory95
+          annotations:
+            description:
+              The memory usage of {{ $labels.namespace }}.{{ $labels.pod }}
+              is greater than 95%, and the current value is {{ printf "%.2f" $value }}%.
+          expr: |
+            100 * (sum(container_memory_working_set_bytes{id!="/"}) by (pod,namespace,container,cluster) / sum(kube_pod_container_resource_limits{resource="memory"}) by (pod,namespace,container,cluster)) > 95
+          for: 5m
+          labels:
+            severity: info
+        - alert: PodMem8GbRestart
+          annotations:
+            description:
+              "{{ $labels.namespace }}.{{ $labels.pod }} uses more than 8GB
+              of memory."
+          expr: |
+            (sum (container_memory_working_set_bytes{id!="/",pod!="",container!=""})by (pod,namespace,cluster) /1024/1024/1024) > 8
+          for: 5m
+          labels:
+            severity: info
+        - alert: PodRestart
+          annotations:
+            description: "{{ $labels.namespace }}.{{ $labels.pod }} unexpected restart."
+          expr: |
+            sum(increase(kube_pod_container_status_restarts_total[2m])) by (pod,namespace,container,cluster) > 2
+          for: 10m
+          labels:
+            severity: warning

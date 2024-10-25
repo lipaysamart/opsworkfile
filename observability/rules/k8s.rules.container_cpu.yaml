@@ -1,0 +1,23 @@
+---
+# Source: victoria-metrics-k8s-stack/templates/rules/k8s.rules.container_cpu_usage_seconds_total.yaml
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  namespace: monitor
+  name: victoria-metrics-k8s.rules.container.cpuusage
+  labels:
+    app: victoria-metrics
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/instance: vm-operator
+    app.kubernetes.io/version: "v1.101.0"
+spec:
+  groups:
+  - name: k8s.rules.container_cpu_usage_seconds_total
+    rules:
+    - expr: |-
+        sum by (cluster, namespace, pod, container) (
+          irate(container_cpu_usage_seconds_total{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}[5m])
+        ) * on (cluster, namespace, pod) group_left(node) topk by (cluster, namespace, pod) (
+          1, max by(cluster, namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate

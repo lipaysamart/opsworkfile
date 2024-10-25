@@ -1,0 +1,31 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlert
+metadata:
+  name: main
+  namespace: monitor
+spec:
+  image:
+    repository: victoriametrics/vmalert
+    tag: v1.93.15
+    pullPolicy: Always
+  replicaCount: 1
+  extraArgs:
+    external.url: "https://${HOST}"
+  evaluationInterval: "3m"
+  remoteWrite:
+    url: http://vmsingle-victoria-metrics:8429
+  remoteRead:
+    url: http://vmsingle-victoria-metrics:8429
+  datasource:
+    url: http://vmsingle-victoria-metrics:8429
+  notifiers:
+    - url: http://vmalertmanager-main:9093/alertmanager
+  ruleSelector: {}
+  ruleNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: monitor
+  tolerations:
+    - key: ack-pool-name
+      value: prod
+      operator: Equal
+      effect: NoSchedule

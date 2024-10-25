@@ -1,0 +1,56 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMProbe
+metadata:
+  name: vmprobe-main
+  namespace: monitor
+spec:
+  interval: 60s
+  jobName: vmprobe-main
+  module: http_2xx
+  vmProberSpec:
+    path: /probe
+    url: blackbox-exporter:19115
+  targets:
+    ingress:
+      namespaceSelector:
+        any: true
+      relabelingConfigs:
+        - action: keep
+          regex: "true"
+          sourceLabels:
+            - __meta_kubernetes_ingress_annotation_prometheus_io_probe
+        - action: replace
+          regex: (.+);(.+);(.+)
+          replacement: ${1}://${2}${3}
+          separator: ;
+          sourceLabels:
+            - __meta_kubernetes_ingress_scheme
+            - __meta_kubernetes_ingress_host
+            - __meta_kubernetes_ingress_path
+          targetLabel: __param_target
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_namespace
+          targetLabel: namespace
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_ingress_name
+          targetLabel: ingress
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMProbe
+metadata:
+  name: vmprobe-static
+  namespace: monitor
+spec:
+  interval: 60s
+  scrapeTimeout: 10s
+  jobName: vmprobe-static
+  module: http_2xx
+  vmProberSpec:
+    path: /probe
+    url: blackbox-exporter:19115
+  targets:
+    staticConfig:
+      targets:
+        - https://${HOST}
