@@ -36,7 +36,7 @@ EOL
 
 # 重启网络服务
 echo "重启网络服务..."
-sudo systemctl restart networking
+systemctl restart networking
 
 # 验证配置
 echo "验证网络配置..."
