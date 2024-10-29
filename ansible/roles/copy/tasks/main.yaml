@@ -1,0 +1,7 @@
+- name: Copy file with owner and permissions
+  ansible.builtin.copy:
+    src: README.md
+    dest: /tmp/README.md
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "644"
