@@ -1,11 +1,3 @@
-- name: Print ACR_USERNAME variable
-  ansible.builtin.debug:
-    msg: "{{ lookup('ansible.builtin.env', 'ACR_USERNAME') }}"
-
-- name: Print ACR_USERNAME variable
-  ansible.builtin.debug:
-    msg: "{{ lookup('ansible.builtin.env', 'ACR_PASSWORD') }}"
-
 - name: Log into aliyun registry
   community.docker.docker_login:
     registry_url: registry.cn-shenzhen.aiyuncs.com
