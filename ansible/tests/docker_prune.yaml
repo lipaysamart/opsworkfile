@@ -1,0 +1,9 @@
+- name: docker-prune
+  hosts:
+    - tcwork
+  tasks:
+    - name: Print docker system info
+      shell: docker system df > /dev/stdout
+
+    - name: docker cache clear
+      shell: docker builder prune --filter type=build-cache --force && docker image prune --force && docker images | awk '{print $3}' | xargs docker rmi > /dev/null

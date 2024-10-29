@@ -1,0 +1,8 @@
+- name: Docker build cache clean
+  hosts:
+    - tcagent
+  tasks:
+    - name: Prune cache
+      community.docker.docker_prune:
+        images: true
+        builder_cache: true

@@ -2,7 +2,7 @@
   remote_user: isadmin # Change remote user to your sudo user!
   become: true
   hosts:
-    - test
+    - docker
   roles:
     - docker
   vars:

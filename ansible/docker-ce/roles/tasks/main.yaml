@@ -89,9 +89,3 @@
   loop:
     - docker.service
     - containerd.service
-
-- name: Print docker system info
-  ansible.builtin.command:
-    argv:
-      - /usr/bin/docker
-      - info
