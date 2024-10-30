@@ -1,0 +1,5 @@
+- hosts: all
+  roles:
+    - blackbox-exporter
+  vars:
+    CONTAINER_IMAGE: registry.cn-shenzhen.aliyuncs.com/lipaysam/blackbox-exporter:v0.24.0

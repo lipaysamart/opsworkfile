@@ -6,3 +6,11 @@
       community.docker.docker_prune:
         images: true
         builder_cache: true
+
+- name: Log into aliyun registry
+  community.docker.docker_login:
+    registry_url: registry.cn-shenzhen.aliyuncs.com
+    username: "{{ lookup('ansible.builtin.env', 'ACR_USERNAME') }}"
+    password: "{{ lookup('ansible.builtin.env', 'ACR_PASSWORD') }}"
+    reauthorize: true
+    state: present

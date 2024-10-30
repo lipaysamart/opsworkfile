@@ -1,0 +1,24 @@
+- name: Configuration blackbox-exporter
+  ansible.builtin.copy:
+    src: files/
+    dest: /home/isadmin/isp-monitor/blackbox-exporter/
+    owner: isadmin
+    group: isadmin
+    mode: "644"
+
+- name: Create a blackbox container
+  community.docker.docker_container:
+    name: blackbox
+    image: "{{ CONTAINER_IMAGE }}"
+    restart_policy: always
+    ports:
+      - 9115:9115
+    command:
+      - "--config.file=/config/blackbox.yml"
+      - "--web.config.file=/config/web-config.yml"
+      - "--history.limit=100"
+      - "--web.listen-address=:9115"
+      - "--log.level=info"
+      - "--log.format=json"
+    volumes:
+      - /home/isadmin/isp-monitor/blackbox-exporter:/config

@@ -1,0 +1,6 @@
+http_server_config:
+  http2: true
+
+# 密码必须是 bcrypt 哈希值, 可以使用 htpasswd 工具生成
+basic_auth_users:
+  isadmin: $2y$05$NzI3IWbk9E.92ikTyLbpHug9pTBYI7kq9MnJg7RnK8JoQfmbTmLqU
