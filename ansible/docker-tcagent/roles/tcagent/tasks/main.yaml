@@ -1,2 +1,0 @@
-- name: Include registry login tasks
-  import_tasks: aliyun-registry-login.yaml
