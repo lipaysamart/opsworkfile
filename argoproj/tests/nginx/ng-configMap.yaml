@@ -1,0 +1,11 @@
+kind: Secret
+apiVersion: v1
+metadata:
+  name: vault-example
+  namespace: demo
+  annotations:
+    avp.kubernetes.io/path: "secrets/kv/acr"
+    avp.kubernetes.io/secret-version: "1"
+type: Opaque
+stringData:
+  username: <accessKeyId>
