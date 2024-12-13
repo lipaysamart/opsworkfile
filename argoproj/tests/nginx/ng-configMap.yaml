@@ -4,7 +4,7 @@ metadata:
   name: vault-example
   namespace: demo
   annotations:
-    avp.kubernetes.io/path: "secret/kv/acr"
+    avp.kubernetes.io/path: "secret/data/kv/acr"
     avp.kubernetes.io/secret-version: "1"
 type: Opaque
 stringData:
